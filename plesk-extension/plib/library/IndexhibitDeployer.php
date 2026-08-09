@@ -9,9 +9,13 @@ class IndexhibitDeployer
     /** @var string */
     private $packagePath;
 
-    public function __construct()
+    /** @var string */
+    private $systemUser;
+
+    public function __construct($packagePath = '', $systemUser = '')
     {
-        $this->packagePath = __DIR__ . '/../../data/indexhibit-package.tar.gz';
+        $this->packagePath = $packagePath ?: __DIR__ . '/../../data/indexhibit-package.tar.gz';
+        $this->systemUser = $systemUser;
     }
 
     /**
@@ -20,7 +24,7 @@ class IndexhibitDeployer
      * @param string $documentRoot
      * @param string $domain
      * @param array $db
-     * @return array Result with 'success', 'message', and 'admin_url'.
+     * @return array Result with 'success', 'message', 'admin_url', 'admin_username', 'admin_password'.
      */
     public function deploy($documentRoot, $domain, array $db)
     {
@@ -40,7 +44,12 @@ class IndexhibitDeployer
         $installScript = $documentRoot . '/install.sh';
         if (file_exists($installScript)) {
             $this->runInstallScript($installScript, $documentRoot);
+        } else {
+            $this->applyDefaultPermissions($documentRoot);
         }
+
+        $adminUsername = !empty($db['admin_username']) ? $db['admin_username'] : 'index1';
+        $adminPassword = !empty($db['admin_password']) ? $db['admin_password'] : $this->generatePassword();
 
         $endpoint = 'https://' . $domain . '/ndxzstudio/auto-install.php';
         $payload = array(
@@ -48,18 +57,26 @@ class IndexhibitDeployer
             'admin_first_name' => 'Admin',
             'admin_last_name' => 'User',
             'admin_email' => 'admin@' . $domain,
-            'admin_username' => 'index1',
-            'admin_password' => $this->generatePassword(),
+            'admin_username' => $adminUsername,
+            'admin_password' => $adminPassword,
             'db_host' => $db['db_host'],
             'db_name' => $db['db_name'],
             'db_user' => $db['db_user'],
             'db_password' => $db['db_password'],
             'table_prefix' => $db['table_prefix'],
-            'theme' => 'default',
+            'theme' => !empty($db['theme']) ? $db['theme'] : 'default',
             'auth_token' => $this->getAuthToken(),
         );
 
-        return $this->callAutoInstallEndpoint($endpoint, $payload);
+        $result = $this->callAutoInstallEndpoint($endpoint, $payload);
+        if (!$result['success']) {
+            return $result;
+        }
+
+        $result['admin_username'] = $adminUsername;
+        $result['admin_password'] = $adminPassword;
+
+        return $result;
     }
 
     private function extractPackage($documentRoot)
@@ -87,9 +104,39 @@ class IndexhibitDeployer
             escapeshellarg($documentRoot)
         );
 
+        if ($this->systemUser !== '') {
+            $command = sprintf('su -s /bin/bash %s -c %s', escapeshellarg($this->systemUser), escapeshellarg($command));
+        }
+
         exec($command, $output, $exitCode);
 
         return $exitCode === 0;
+    }
+
+    /**
+     * Fallback when install.sh is missing: rename htaccess and set writable dirs.
+     *
+     * @param string $documentRoot
+     */
+    private function applyDefaultPermissions($documentRoot)
+    {
+        $htaccess = $documentRoot . '/htaccess';
+        if (file_exists($htaccess) && !file_exists($documentRoot . '/.htaccess')) {
+            rename($htaccess, $documentRoot . '/.htaccess');
+        }
+
+        $writable = array(
+            $documentRoot . '/files',
+            $documentRoot . '/files/gimgs',
+            $documentRoot . '/files/dimgs',
+            $documentRoot . '/ndxzsite/config',
+        );
+
+        foreach ($writable as $path) {
+            if (is_dir($path)) {
+                chmod($path, 0755);
+            }
+        }
     }
 
     private function callAutoInstallEndpoint($endpoint, array $payload)

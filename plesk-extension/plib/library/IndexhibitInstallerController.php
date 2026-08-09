@@ -38,6 +38,22 @@ class IndexhibitInstallerController
         }
     }
 
+    /**
+     * Generate a safe database name from a base string.
+     *
+     * @param string $base
+     * @return string
+     */
+    private function safeDbName($base)
+    {
+        $name = strtolower(preg_replace('/[^a-z0-9_]/', '_', $base));
+        $name = trim($name, '_');
+        if (strlen($name) > 32) {
+            $name = substr($name, 0, 32);
+        }
+        return $name;
+    }
+
     private function showIndex()
     {
         $domains = $this->apiClient->listDomains();
@@ -72,8 +88,8 @@ class IndexhibitInstallerController
         }
 
         $dbPassword = $this->generatePassword();
-        $dbName = 'indexhibit_' . $domainId;
-        $dbUser = 'indexhibit_' . $domainId;
+        $dbName = $this->safeDbName('indexhibit_' . $domain['domain']);
+        $dbUser = $dbName;
 
         $result = $this->apiClient->createDatabase(
             $domainId,
@@ -107,9 +123,17 @@ class IndexhibitInstallerController
             return;
         }
 
+        $message = sprintf(
+            'Indexhibit installed on %s. Admin URL: %s. Admin username: %s',
+            htmlspecialchars($domain['domain']),
+            htmlspecialchars($deployResult['admin_url']),
+            htmlspecialchars($deployResult['admin_username'])
+        );
+
         $this->messages[] = array(
             'type' => 'success',
-            'text' => 'Indexhibit installed on ' . htmlspecialchars($domain['domain']) . '. Admin URL: ' . htmlspecialchars($deployResult['admin_url'])
+            'text' => $message,
+            'admin_password' => $deployResult['admin_password'],
         );
 
         $this->showIndex();

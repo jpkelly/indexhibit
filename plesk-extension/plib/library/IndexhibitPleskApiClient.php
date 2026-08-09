@@ -101,6 +101,55 @@ class IndexhibitPleskApiClient
     }
 
     /**
+     * Look up a subscription by its domain name.
+     *
+     * Useful when the extension is invoked from a domain context rather than
+     * a subscription ID.
+     *
+     * @param string $domain
+     * @return array|null
+     */
+    public function findSubscriptionByDomain($domain)
+    {
+        $xml = sprintf(
+            '<webspace><get><filter><name>%s</name></filter><dataset><gen_info/><hosting/></dataset></get></webspace>',
+            $this->escapeXml($domain)
+        );
+
+        $response = $this->callXmlApi($xml);
+        if (!is_object($response) || !isset($response->webspace->get->result)) {
+            return null;
+        }
+
+        $result = $response->webspace->get->result;
+        if ((string) $result->status !== 'ok') {
+            return null;
+        }
+
+        $id = (int) $result->id;
+        $documentRoot = '';
+        if (isset($result->data->hosting->vrt_hst->property)) {
+            foreach ($result->data->hosting->vrt_hst->property as $property) {
+                if ((string) $property->name === 'document_root') {
+                    $documentRoot = (string) $property->value;
+                    break;
+                }
+            }
+        }
+
+        if ($documentRoot === '') {
+            return null;
+        }
+
+        return array(
+            'id' => $id,
+            'webspace_id' => $id,
+            'domain' => $domain,
+            'document_root' => $documentRoot,
+        );
+    }
+
+    /**
      * Create a MySQL database and database user for a subscription.
      *
      * @param int $domainId

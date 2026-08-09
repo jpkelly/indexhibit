@@ -156,10 +156,10 @@ Tasks:
 | 1 — Research Plesk APIs | Complete | Use Plesk PHP SDK `InternalClient` / `pm_ApiRpc` from inside the extension; XML API for webspace/db operations; CLI as fallback only. |
 | 2 — Extension skeleton | Complete | `plesk-extension/` directory with `meta.xml`, `DESCRIPTION.md`, `htdocs/index.php`, `plib/library/` controllers/API/deployer, and `plib/views/scripts/`. |
 | 3 — Domain selection UI | Complete | Domain list filtered to active, hosted, not-already-installed subscriptions; form styled with CSS. |
-| 4 — Database provisioning | Not started | |
-| 5 — File deployment | Not started | |
-| 6 — Trigger headless installer | Not started | Depends on existing `ndxzstudio/auto-install.php` |
-| 7 — Security + docs | Not started | |
+| 4 — Database provisioning | Complete | `IndexhibitPleskApiClient::createDatabase()` creates MySQL DB and user on the selected subscription; safe DB names generated from domain. |
+| 5 — File deployment | Complete | `IndexhibitDeployer::deploy()` extracts `data/indexhibit-package.tar.gz`, runs `install.sh` or falls back to default permissions/`.htaccess` rename. |
+| 6 — Trigger headless installer | Complete | `IndexhibitDeployer` POSTs JSON to `https://DOMAIN/ndxzstudio/auto-install.php`; UI displays admin URL, username, and password on success. |
+| 7 — Security + docs | In progress | CSRF token already in UI form; needs privilege check, password handling review, and final packaging docs. |
 
 ---
 

@@ -17,6 +17,10 @@
     <?php foreach ($messages as $message): ?>
         <div class="msg-box msg-<?php echo htmlspecialchars($message['type']); ?>" role="alert">
             <?php echo $message['text']; ?>
+            <?php if (!empty($message['admin_password'])): ?>
+                <br />
+                Admin password: <code><?php echo htmlspecialchars($message['admin_password']); ?></code>
+            <?php endif; ?>
         </div>
     <?php endforeach; ?>
 
