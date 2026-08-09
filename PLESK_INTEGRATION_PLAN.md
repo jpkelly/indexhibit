@@ -147,6 +147,41 @@ Tasks:
 
 **Deliverable**: Secure, documented Plesk extension ready for packaging and distribution.
 
+### Packaging the Extension
+
+1. Build the Indexhibit package:
+   ```bash
+   ./package.sh
+   ```
+   This produces `indexhibit-2.1.6.tar.gz` in the repository root.
+2. Copy the archive into the extension data directory:
+   ```bash
+   cp indexhibit-2.1.6.tar.gz plesk-extension/data/indexhibit-package.tar.gz
+   ```
+3. Create the auth token file:
+   ```bash
+   cp plesk-extension/data/auth-token.example.txt plesk-extension/data/auth-token.txt
+   # edit auth-token.txt and set a strong random token
+   ```
+4. Zip the extension contents:
+   ```bash
+   cd plesk-extension
+   zip -r ../indexhibit-installer-plesk.zip .
+   ```
+5. Install the resulting `.zip` in Plesk under **Extensions > My Extensions > Upload Extension**.
+
+### Configuration
+
+- The auto-install endpoint auth token is read from `plesk-extension/data/auth-token.txt`.
+- Database names are derived from the selected domain and truncated to 32 characters.
+- The extension skips subscriptions that already contain `ndxzsite/config/config.php`.
+
+### Security Notes
+
+- `IndexhibitInstallerController::isAuthorized()` allows only admin or reseller users.
+- The install form includes a Plesk CSRF token.
+- Admin passwords are shown once after a successful install and are not logged or persisted by the extension.
+
 ---
 
 ## Progress Tracker
@@ -159,7 +194,7 @@ Tasks:
 | 4 — Database provisioning | Complete | `IndexhibitPleskApiClient::createDatabase()` creates MySQL DB and user on the selected subscription; safe DB names generated from domain. |
 | 5 — File deployment | Complete | `IndexhibitDeployer::deploy()` extracts `data/indexhibit-package.tar.gz`, runs `install.sh` or falls back to default permissions/`.htaccess` rename. |
 | 6 — Trigger headless installer | Complete | `IndexhibitDeployer` POSTs JSON to `https://DOMAIN/ndxzstudio/auto-install.php`; UI displays admin URL, username, and password on success. |
-| 7 — Security + docs | In progress | CSRF token already in UI form; needs privilege check, password handling review, and final packaging docs. |
+| 7 — Security + docs | Complete | Admin/reseller authorization check, CSRF token, one-time password display, packaging instructions added. |
 
 ---
 

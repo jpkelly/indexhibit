@@ -18,8 +18,16 @@ It creates the MySQL database and user within Plesk, deploys the packaged Indexh
 3. Select a subscription and click **Install Indexhibit**.
 4. The extension creates the database, deploys files, and completes the install automatically.
 
+## Packaging
+
+1. Run `./package.sh` to build `indexhibit-2.1.6.tar.gz`.
+2. Copy it into the extension data directory as `indexhibit-package.tar.gz`.
+3. Copy `data/auth-token.example.txt` to `data/auth-token.txt` and set a strong token.
+4. Zip the `plesk-extension/` contents and upload the archive in **Extensions > My Extensions > Upload Extension**.
+
 ## Security
 
 - The extension requires administrator or reseller privileges.
-- Configure the auto-install endpoint auth token under extension settings.
+- The auto-install endpoint auth token is read from `data/auth-token.txt`.
+- Generated admin passwords are shown once after installation and are not logged.
 - Remove the auto-install endpoint scripts from the deployed site after installation.

@@ -25,6 +25,12 @@ class IndexhibitInstallerController
 
     public function run()
     {
+        if (!$this->isAuthorized()) {
+            $this->messages[] = array('type' => 'error', 'text' => 'Access denied. Administrator or reseller privileges required.');
+            $this->showIndex();
+            return;
+        }
+
         $action = isset($_GET['action']) ? $_GET['action'] : 'index';
 
         switch ($action) {
@@ -36,6 +42,21 @@ class IndexhibitInstallerController
                 $this->showIndex();
                 break;
         }
+    }
+
+    /**
+     * Verify that the current Plesk user is allowed to run the installer.
+     *
+     * @return bool
+     */
+    private function isAuthorized()
+    {
+        if (!class_exists('pm_Session')) {
+            return false;
+        }
+
+        $client = pm_Session::getClient();
+        return $client->isAdmin() || $client->isReseller();
     }
 
     /**
@@ -61,6 +82,13 @@ class IndexhibitInstallerController
         $csrfToken = pm_Session::getClient()->getSecretKey();
 
         require __DIR__ . '/../views/scripts/index.phtml';
+
+        // Prevent sensitive values from lingering in the messages array.
+        foreach ($this->messages as $key => $message) {
+            if (isset($message['admin_password'])) {
+                unset($this->messages[$key]['admin_password']);
+            }
+        }
     }
 
     private function handleInstall()

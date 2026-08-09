@@ -20,8 +20,8 @@ domain, calls the Plesk XML API to create the database, then posts to the
 auto-install endpoint.
 2. **Plesk extension (optional)** — a Plesk admin/reseller extension that lets
 you pick a subscription, create the database, deploy files, and trigger the
-installer. See [`plesk-extension/`](plesk-extension/) and
-[`PLESK_INTEGRATION_PLAN.md`](PLESK_INTEGRATION_PLAN.md).
+installer. Build instructions are in
+[`PLESK_INTEGRATION_PLAN.md`](PLESK_INTEGRATION_PLAN.md#segment-7--security-cleanup-and-documentation).
 
 ### Quick Start — WHMCS + Plesk
 
