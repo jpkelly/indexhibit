@@ -55,6 +55,9 @@ installer. See [`plesk-extension/`](plesk-extension/) and
    - Create a MySQL database and user on that subscription.
    - POST the install payload to the endpoint.
    - Save the generated admin credentials in WHMCS for the client area.
+7. Use **Test Connection** in the WHMCS admin product config to validate Plesk
+   API credentials and subscription lookup without creating a database or
+   installing anything.
 
 ### Manual Endpoint Test
 

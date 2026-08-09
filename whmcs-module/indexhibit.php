@@ -153,6 +153,42 @@ function indexhibit_CreateAccount(array $params)
     return 'success';
 }
 
+/**
+ * WHMCS Test Connection entry point.
+ *
+ * Validates Plesk API credentials and subscription lookup for the service
+ * domain without creating a database or running the installer.
+ *
+ * @param array $params WHMCS module parameters.
+ * @return array WHMCS expects array('success' => true) or array('error' => 'message').
+ */
+function indexhibit_TestConnection(array $params)
+{
+    $plesk = indexhibit_plesk_client($params);
+    if (!$plesk) {
+        return array('error' => 'Plesk API credentials are not configured.');
+    }
+
+    $domain = $params['domain'];
+    if (empty($domain)) {
+        return array('error' => 'No service domain is assigned.');
+    }
+
+    $subscription = $plesk->findSubscriptionByDomain($domain);
+    if (!$subscription) {
+        return array('error' => 'No Plesk subscription found for domain: ' . $domain);
+    }
+
+    return array(
+        'success' => true,
+        'xmlapi'  => array(
+            'domain'       => $subscription['domain'],
+            'webspace_id'  => $subscription['id'],
+            'document_root'=> $subscription['document_root'],
+        ),
+    );
+}
+
 function indexhibit_SuspendAccount(array $params)
 {
     // No suspend action implemented at this time.
