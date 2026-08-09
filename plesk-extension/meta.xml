@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module>
+  <id>indexhibit-installer</id>
+  <name>Indexhibit Installer</name>
+  <description>Installs Indexhibit onto a selected Plesk subscription with automatic database provisioning.</description>
+  <version>1.0.0</version>
+  <release>1</release>
+  <vendor>jp-kelly</vendor>
+  <url>https://jp-kelly.com/</url>
+  <plesk_min_version>18.0</plesk_min_version>
+  <dependencies>
+    <dependency>PHP 7.4+</dependency>
+  </dependencies>
+</module>

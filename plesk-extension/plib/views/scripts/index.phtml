@@ -1,0 +1,49 @@
+<?php
+/**
+ * Main UI template for the Indexhibit Plesk extension.
+ *
+ * Variables available:
+ *   $domains   array of domains/subscriptions
+ *   $csrfToken string
+ *   $messages  array of arrays with keys 'type' and 'text'
+ */
+?>
+
+<link rel="stylesheet" type="text/css" href="css/styles.css" />
+
+<div class="indexhibit-installer">
+    <h2>Install Indexhibit</h2>
+
+    <?php foreach ($messages as $message): ?>
+        <div class="msg-box msg-<?php echo htmlspecialchars($message['type']); ?>" role="alert">
+            <?php echo $message['text']; ?>
+        </div>
+    <?php endforeach; ?>
+
+    <?php if (empty($domains)): ?>
+        <p>No suitable subscriptions are available. Either none are active, or Indexhibit already appears installed on every available subscription.</p>
+    <?php else: ?>
+        <form method="post" action="?action=install">
+            <input type="hidden" name="_token" value="<?php echo htmlspecialchars($csrfToken); ?>" />
+
+            <div class="form-row">
+                <label for="domain_id">Select Domain:</label>
+                <select name="domain_id" id="domain_id" required>
+                    <option value="">-- Choose a subscription --</option>
+                    <?php foreach ($domains as $domain): ?>
+                        <option value="<?php echo (int) $domain['id']; ?>">
+                            <?php echo htmlspecialchars($domain['domain']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <p class="hint">
+                This will create a MySQL database, deploy Indexhibit files, and
+                complete the installation on the selected subscription.
+            </p>
+
+            <button type="submit" class="btn">Install Indexhibit</button>
+        </form>
+    <?php endif; ?>
+</div>

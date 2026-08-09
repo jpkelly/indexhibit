@@ -1,0 +1,53 @@
+.indexhibit-installer {
+    max-width: 600px;
+    padding: 20px;
+}
+
+.indexhibit-installer h2 {
+    margin-bottom: 18px;
+}
+
+.indexhibit-installer .form-row {
+    margin-bottom: 14px;
+}
+
+.indexhibit-installer label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+
+.indexhibit-installer select {
+    min-width: 280px;
+    padding: 6px 8px;
+}
+
+.indexhibit-installer .hint {
+    color: #666;
+    font-size: 0.95em;
+    margin: 12px 0;
+}
+
+.indexhibit-installer .btn {
+    padding: 8px 16px;
+    cursor: pointer;
+}
+
+.msg-box {
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+}
+
+.msg-success {
+    background-color: #dff0d8;
+    border-color: #d6e9c6;
+    color: #3c763d;
+}
+
+.msg-error {
+    background-color: #f2dede;
+    border-color: #ebccd1;
+    color: #a94442;
+}

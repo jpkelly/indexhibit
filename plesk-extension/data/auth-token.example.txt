@@ -1,0 +1,3 @@
+# Copy this file to auth-token.txt and replace the value below with a strong random token.
+# The token must match the $required_auth_token value in ndxzstudio/auto-install.php.
+CHANGE_ME_TO_A_STRONG_RANDOM_TOKEN

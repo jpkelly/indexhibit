@@ -17,11 +17,19 @@ if (!defined('WHMCS')) {
  *   - Default Theme              (e.g. default)
  *   - Default Admin Username     (e.g. index1)
  *   - Default Admin Password     (generated if left blank)
+ *   - Plesk API Base URL         (e.g. https://{serverhostname}:8443)
+ *   - Plesk API Username         (admin or reseller)
+ *   - Plesk API Password         (or API Key below)
+ *   - Plesk API Key              (takes precedence over password)
+ *
+ * If no database custom fields are supplied, the module asks Plesk to create
+ * a MySQL database on the service domain before calling the auto-install endpoint.
  *
  * @version 2.1.6
  */
 
 require_once __DIR__ . '/lib/indexhibit_client.php';
+require_once __DIR__ . '/lib/PleskApiClient.php';
 
 function indexhibit_MetaData()
 {
@@ -67,6 +75,30 @@ function indexhibit_ConfigOptions()
             'Default' => '',
             'Description' => 'Fallback admin password if the client does not supply one. Leave blank to generate.',
         ),
+        'Plesk API Base URL' => array(
+            'Type' => 'text',
+            'Size' => '64',
+            'Default' => 'https://{serverhostname}:8443',
+            'Description' => 'Base URL for Plesk XML API. Use {serverhostname} as placeholder.',
+        ),
+        'Plesk API Username' => array(
+            'Type' => 'text',
+            'Size' => '32',
+            'Default' => 'admin',
+            'Description' => 'Plesk admin or reseller username.',
+        ),
+        'Plesk API Password' => array(
+            'Type' => 'password',
+            'Size' => '32',
+            'Default' => '',
+            'Description' => 'Plesk admin or reseller password. Required if API Key is not used.',
+        ),
+        'Plesk API Key' => array(
+            'Type' => 'password',
+            'Size' => '64',
+            'Default' => '',
+            'Description' => 'Plesk API secret key. If provided, it takes precedence over password.',
+        ),
     );
 }
 
@@ -78,10 +110,10 @@ function indexhibit_CreateAccount(array $params)
     $adminUsername = indexhibit_admin_username($params);
     $adminPassword = indexhibit_admin_password($params);
 
-    $db = indexhibit_build_db_params($params);
+    $db = indexhibit_build_db_params($params, $params['domain']);
 
-    if (empty($db['db_name']) || empty($db['db_user'])) {
-        return 'Database credentials from WHMCS are incomplete.';
+    if (empty($db['db_name']) || empty($db['db_user']) || empty($db['db_password'])) {
+        return 'Database credentials are incomplete.';
     }
 
     $payload = array(
@@ -166,19 +198,87 @@ function indexhibit_build_endpoint(array $params)
     return str_replace('{domain}', $params['domain'], $template);
 }
 
-function indexhibit_build_db_params(array $params)
+function indexhibit_build_db_params(array $params, $domain)
 {
-    return array(
-        'db_host'     => !empty($params['serverhostname']) ? $params['serverhostname'] : 'localhost',
-        'db_name'     => $params['configoption4'] ?? $params['serviceid'] . '_indexhibit',
-        'db_user'     => $params['configoption5'] ?? $params['serviceid'] . '_indexhibit',
-        'db_password' => $params['configoption6'] ?? '',
-    );
+    $db = array();
+
+    // Prefer explicit custom fields if populated.
+    if (!empty($params['customfields']['Database Name']) && !empty($params['customfields']['Database User'])) {
+        $db['db_name'] = $params['customfields']['Database Name'];
+        $db['db_user'] = $params['customfields']['Database User'];
+        $db['db_password'] = $params['customfields']['Database Password'];
+        $db['db_host'] = !empty($params['customfields']['Database Host'])
+            ? $params['customfields']['Database Host']
+            : 'localhost';
+
+        return $db;
+    }
+
+    // Otherwise, ask Plesk to create a database on the service domain.
+    $plesk = indexhibit_plesk_client($params);
+    if (!$plesk) {
+        return $db;
+    }
+
+    $subscription = $plesk->findSubscriptionByDomain($domain);
+    if (!$subscription) {
+        return $db;
+    }
+
+    $dbHost = 'localhost';
+    $dbName = indexhibit_safe_db_name('indexhibit_' . $domain);
+    $dbUser = $dbName;
+    $dbPassword = indexhibit_random_password(18);
+
+    $created = $plesk->createDatabase($subscription['id'], $dbName, $dbUser, $dbPassword);
+    if (!$created['success']) {
+        return $db;
+    }
+
+    $db['db_host'] = $dbHost;
+    $db['db_name'] = $dbName;
+    $db['db_user'] = $dbUser;
+    $db['db_password'] = $dbPassword;
+
+    return $db;
+}
+
+function indexhibit_plesk_client(array $params)
+{
+    $baseUrl = $params['configoption6'];
+    if (empty($baseUrl)) {
+        $baseUrl = 'https://' . $params['serverhostname'] . ':8443';
+    } else {
+        $baseUrl = str_replace('{serverhostname}', $params['serverhostname'], $baseUrl);
+    }
+
+    $username = $params['configoption7'];
+    $password = $params['configoption8'];
+    $apiKey = $params['configoption9'];
+
+    if (empty($baseUrl) || (empty($apiKey) && (empty($username) || empty($password)))) {
+        return null;
+    }
+
+    return new PleskApiClient($baseUrl, $username, $password, $apiKey);
+}
+
+function indexhibit_safe_db_name($name)
+{
+    $name = strtolower(preg_replace('/[^a-z0-9_]/', '_', $name));
+    $name = trim($name, '_');
+    if (strlen($name) > 32) {
+        $name = substr($name, 0, 32);
+    }
+    return $name;
 }
 
 function indexhibit_admin_username(array $params)
 {
-    $username = $params['configoption4'];
+    $username = isset($params['customfields']['Admin Username']) && !empty($params['customfields']['Admin Username'])
+        ? $params['customfields']['Admin Username']
+        : $params['configoption4'];
+
     if (empty($username)) {
         $username = 'index1';
     }
@@ -187,7 +287,10 @@ function indexhibit_admin_username(array $params)
 
 function indexhibit_admin_password(array $params)
 {
-    $password = $params['configoption5'];
+    $password = isset($params['customfields']['Admin Password']) && !empty($params['customfields']['Admin Password'])
+        ? $params['customfields']['Admin Password']
+        : $params['configoption5'];
+
     if (empty($password)) {
         $password = indexhibit_random_password();
     }
