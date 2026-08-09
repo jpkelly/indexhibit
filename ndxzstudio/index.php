@@ -21,6 +21,18 @@ require_once 'common.php';
 $default['timer'] = microtime_float();
 
 // make sure we have our connection array
+// If the site hasn't been installed yet and the installer is still present,
+// redirect to the auto-installer instead of showing "Database is not installed."
+// If the site hasn't been installed yet and the auto-installer is present,
+// redirect to the auto-installer instead of showing "Database is not installed."
+$protocol = (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === 'off') ? 'http' : 'https';
+$scriptPath = dirname($_SERVER['SCRIPT_NAME']);
+if (!file_exists('../ndxzsite/config/config.php') && file_exists('auto-install.php')) {
+    $redirectUrl = rtrim($protocol . '://' . $_SERVER['HTTP_HOST'] . $scriptPath, '/') . '/auto-install.php';
+    header('Location: ' . $redirectUrl);
+    exit;
+}
+
 shutDownCheck();
 	
 // preloading helpers

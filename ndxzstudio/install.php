@@ -20,9 +20,6 @@ class Installation
 	var $lang;
 	var $db;
 	var $charset_collate;
-	var $charset = 'utf8';
-	var $collate = 'utf8_unicode_ci';
-
 	public function __construct()
 	{
 		require_once '../ndxzsite/config/options.php';
@@ -32,6 +29,7 @@ class Installation
 		require_once './helper/html.php';
 		require_once './helper/time.php';
 		require_once './lang/index.php';
+		require_once './lib/installer.php';
 
 		// look for the cookie here
 		$picked = (isset($_COOKIE['install'])) ? $_COOKIE['install'] : 'en-us';
@@ -97,52 +95,24 @@ class Installation
 	
 	function page_one()
 	{
-		$flagB = false;
-		$flagC = false;
-		$flagD = false;
-		$flagE = false;
+		$installer = new IndexhibitInstaller;
+		$checks = $installer->checkEnvironment();
 
-		if ((is_dir(DIRNAME . '/files')) && (is_writable(DIRNAME . '/files')))
+		$all_ok = true;
+		foreach ($checks as $key => $check)
 		{
-			$flagB = true;
-			$this->html = "<p><span class='ok'>OK</span> " . $this->lang->word('files ok') . "</p>\n";
+			if ($check['ok'])
+			{
+				$this->html .= "<p><span class='ok'>OK</span> " . $check['message'] . "</p>\n";
+			}
+			else
+			{
+				$all_ok = false;
+				$this->html .= "<p><span class='ok-not'>XX</span> " . $check['message'] . "</p>";
+			}
 		}
-		else
-		{
-			$this->html .= "<p><span class='ok-not'>XX</span> " . $this->lang->word('files not ok') . "</p>";
-		}
-		
-		if ((is_dir(DIRNAME . '/files/gimgs')) && (is_writable(DIRNAME . '/files/gimgs')))
-		{
-			$flagC = true;
-			$this->html .= "<p><span class='ok'>OK</span> " . $this->lang->word('filesgimgs ok') . "</p>";
-		}
-		else
-		{
-			$this->html .= "<p><span class='ok-not'>XX</span> " . $this->lang->word('filesgimgs not ok') . "</p>";
-		}
-		
-		if ((is_dir(DIRNAME . '/files/dimgs')) && (is_writable(DIRNAME . '/files/dimgs')))
-		{
-			$flagE = true;
-			$this->html .= "<p><span class='ok'>OK</span> " . $this->lang->word('filesdimgs ok') . "</p>";
-		}
-		else
-		{
-			$this->html .= "<p><span class='ok-not'>XX</span> " . $this->lang->word('filesdimgs not ok') . "</p>";
-		}
-		
-		if ((is_dir(DIRNAME . '/ndxzsite/config')) && (is_writable(DIRNAME . '/ndxzsite/config')))
-		{
-			$flagD = true;
-			$this->html .= "<p><span class='ok'>OK</span> " . $this->lang->word('config ok') . "</p>\n";
-		}
-		else
-		{
-			$this->html .= "<p><span class='ok-not'>XX</span> " . $this->lang->word('config not ok') . "</p>";
-		}
-		
-		if (($flagB == true) && ($flagC == true) && ($flagD == true) && ($flagE == true))
+
+		if ($all_ok)
 		{
 			$this->html .= "<br /><p><strong>" . $this->lang->word('try db setup now') . "</strong></p>";
 			$this->html .= "<br /><p><a href='?p=2'>" . $this->lang->word('continue') . "</a></p><br />";
@@ -324,34 +294,46 @@ class Installation
 	}
 	
 	
+	// Delegated methods (Installation class)
 	function set_charset_collation()
 	{
-		$version = preg_replace('/[^0-9.].*/', '', mysqli_get_server_info($this->db->link));
-		
-		if (version_compare($version, '4.1', '>='))
-		{
-			$this->charset_collate = 'DEFAULT CHARACTER SET ' . $this->charset;
-			$this->charset_collate .= ' COLLATE ' . $this->collate;
-		}
-		
-		$ver = $this->mysqli_ver($this->db->link);
-		
-		return ((is_numeric($ver) && $ver <= 4)) ? 'TYPE=MyISAM' : 'ENGINE=MyISAM DEFAULT CHARSET=utf8';
+		$installer = new IndexhibitInstaller;
+		$this->db = $installer->db;
+		return $installer->setCharsetCollation();
 	}
-	
-	
+
+
 	function install_db()
 	{
 		global $c, $picked, $indx;
-		
+
+		$installer = new IndexhibitInstaller;
+		$admin = array(
+			'site_name' => $c['n_site'],
+			'admin_first_name' => $c['n_fname'],
+			'admin_last_name' => $c['n_lname'],
+			'admin_email' => $c['n_email'],
+			'admin_username' => 'index1',
+			'admin_password_hash' => '22645ed8b5f5fa4b597d0fe61bed6a96',
+			'user_language' => (isset($_COOKIE['user_lang'])) ? $_COOKIE['user_lang'] : 'en-us'
+		);
+		return $installer->installDatabase($admin);
+	}
+
+
+	// LEGACY - retained only for old upgrade flows that call it directly.
+	function legacy_install_db()
+	{
+		global $c, $picked, $indx;
+
 		require_once '../ndxzsite/config/config.php';
 		require_once './db/db.mysql.php';
-		
+
 		$GLOBALS['indx'] = $indx;
 		$this->db = new Db();
 
 		$isam = $this->set_charset_collation();
-		
+
 		$sql = array();
 
 		$sql[] = "CREATE TABLE IF NOT EXISTS iptocountry (
@@ -652,9 +634,13 @@ class Installation
 		{
 			$this->db->query($install);
 		}
+
+		return true;
 	}
-	
-	
+
+
+	// Legacy helpers - no longer used by installer core, kept for upgrade methods that may rely on them.
+
 	/**
 	* Returns string
 	*
@@ -734,39 +720,19 @@ class Installation
 	function writeConfig()
 	{
 		global $c;
-		
+
 		if (!is_array($c)) exit;
-		
-		$path = DIRNAME . '/ndxzsite/config';
-		$filename = $path . '/config.php';
-		
-		$somecontent = "<?php  if (!defined('SITE')) exit('No direct script access allowed');
 
-\$indx['db'] 		= '$c[n_name]';
-\$indx['user'] 		= '$c[n_user]';
-\$indx['pass'] 		= '$c[n_pwd]';
-\$indx['host'] 		= '$c[n_host]';
-\$indx['sql']		= 'mysql';
+		$installer = new IndexhibitInstaller;
+		$config = array(
+			'db_name' => $c['n_name'],
+			'db_user' => $c['n_user'],
+			'db_password' => $c['n_pwd'],
+			'db_host' => $c['n_host'],
+			'table_prefix' => $c['n_appnd']
+		);
 
-if (!defined('PX')) { define('PX', '$c[n_appnd]'); }";
-
-		if (is_writable($path)) 
-		{
-			if (!$handle = fopen($filename, 'w')) 
-			{
-				return FALSE;
-			}
-
-			if (fwrite($handle, $somecontent) === FALSE) 
-			{
-				return FALSE;
-			}
-
-			fclose($handle);
-			return TRUE;
-		}
-
-		return FALSE;
+		return $installer->writeConfig($config);
 	}
 	
 	function getLanguage($default='', $name, $attr='')
@@ -894,42 +860,51 @@ if (!defined('PX')) { define('PX', '$c[n_appnd]'); }";
 			$c['n_pwd']		= getPOST('n_pwd', '', 'connect', 32);
 			$c['n_site']	= getPOST('n_site', '', 'none', 35);
 			$c['n_appnd']	= getPOST('n_appnd', '', 'none', 20);
-		
+
 			// these need to be inserted into the database...
 			$c['n_fname']	= getPOST('n_fname', '', 'none', 35);
 			$c['n_lname']	= getPOST('n_lname', '', 'none', 35);
 			$c['n_email']	= getPOST('n_email', '', 'none', 100);
-		
+
 			$GLOBALS['c'] = $c;
-		
-			// check connection - tables exist?
-			$link = @mysqli_connect($c['n_host'], $c['n_user'], $c['n_pwd']);
-			$_GLOBALS['link'] = $link;
-	
-			if (@mysqli_select_db($link, $c['n_name']) && ($this->writeConfig() == TRUE))
+
+			$installer = new IndexhibitInstaller;
+
+			$db = array(
+				'db_host' => $c['n_host'],
+				'db_user' => $c['n_user'],
+				'db_password' => $c['n_pwd'],
+				'db_name' => $c['n_name'],
+				'table_prefix' => $c['n_appnd']
+			);
+
+			$admin = array(
+				'site_name' => $c['n_site'],
+				'admin_first_name' => $c['n_fname'],
+				'admin_last_name' => $c['n_lname'],
+				'admin_email' => $c['n_email'],
+				'admin_username' => 'index1',
+				'admin_password_hash' => '22645ed8b5f5fa4b597d0fe61bed6a96',
+				'user_language' => (isset($_COOKIE['user_lang'])) ? $_COOKIE['user_lang'] : 'en-us'
+			);
+
+			if (!$installer->testDatabaseConnection($db))
 			{
-				// this is where we try to install
-				$this->install_db();
-			
-				// let's check
-				$result = @mysqli_query($link, "SELECT * FROM " . $c['n_appnd'] . "settings WHERE adm_id = 1");
-			
-				if ($result)
-				{
-					setcookie('ndxz_hash', '5f8bfb51cc5c437a603abe3766d004d8', time()+3600*24*2, '/');
-					setcookie('ndxz_access', md5('exhibit'), time()+3600*24*2, '/');
-					header('location:' . BASEURL . BASENAME . '/install.php?p=3&s=success');
-					exit;
-				}
-				else
-				{
-					$s = "<p><span class='ok-not'>XX</span> " . $this->lang->word('cannot install') . "</p><br />";
-					$s .= "<p><small>" . $this->lang->word('goto forum') . "</small></p><br />";
-				}
+				$s = "<p><span class='ok-not'>XX</span> " . $installer->last_error . "</p><br />";
+				$s .= "<p><small>" . $this->lang->word('goto forum') . "</small></p><br />";
+				return $s;
+			}
+
+			if ($installer->run($db, $admin))
+			{
+				setcookie('ndxz_hash', '5f8bfb51cc5c437a603abe3766d004d8', time()+3600*24*2, '/');
+				setcookie('ndxz_access', md5('exhibit'), time()+3600*24*2, '/');
+				header('location:' . BASEURL . BASENAME . '/install.php?p=3&s=success');
+				exit;
 			}
 			else
 			{
-				$s = "<p><span class='ok-not'>XX</span> " . $this->lang->word('check config') . "</p><br />";
+				$s = "<p><span class='ok-not'>XX</span> " . $installer->last_error . "</p><br />";
 				$s .= "<p><small>" . $this->lang->word('goto forum') . "</small></p><br />";
 			}
 		}
@@ -939,7 +914,7 @@ if (!defined('PX')) { define('PX', '$c[n_appnd]'); }";
 			$s = "<p><span class='ok-not'>XX</span> " . $this->lang->word('check config') . "</p><br />";
 			$s .= "<p><small>" . $this->lang->word('goto forum') . "</small></p><br />";
 		}
-		
+
 		return $s;
 	}
 	
